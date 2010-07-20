@@ -1,0 +1,230 @@
+#!/bin/bash
+
+space=" "
+
+user=$(whoami)
+
+if [ $user != 'root' ]
+   then echo $space
+   echo "MESSAGE: If system_info is ran as root"
+   echo "         and dmidecode is installed more"
+   echo "         information can be gathered!!"
+   echo $space
+fi
+
+if [ -f /etc/init.d/sav-protect ] 
+   then sophos=yes
+else
+   sophos=no
+fi
+
+if [ -f /proc/scsi/scsi ]
+   then scsi=yes 
+else
+   scsi=no
+fi
+
+if [ $user == 'root' ] && [ -f "`which omreport 2>/dev/null`" ]
+   then omreport=yes 
+else
+   omreport=no
+fi
+
+if [ $user == 'root' ] && [ -f "`which hpacucli 2>/dev/null`" ]
+   then hp=yes 
+else
+   hp=no
+fi
+
+if [ $user == 'root' ] && [ -f "`which dmidecode 2>/dev/null`" ]
+   then dmidecode=yes 
+else
+   dmidecode=no
+fi
+
+if [ -f /etc/init.d/psa ]
+   then psa=yes
+else
+   psa=no
+fi
+
+if [ $user == 'root' ] && [ -f "`which megacli 2>/dev/null`" ] && [ $omreport == 'no' ] && [ $hp == 'no' ]
+   then megacli=yes
+else
+   megacli=no
+fi
+
+echo "-------------------------"
+echo "|   OS Type / Version   |"
+echo "-------------------------"
+cat /etc/*-release
+echo $space
+
+echo "-------------------------"
+echo "|       OS Arch         |"
+echo "-------------------------"
+uname -m
+echo $space
+
+if [ "$user" == "root" ]
+  then
+echo "----------------------------"
+echo "|     eth0 Link Speed      |"
+echo "----------------------------"
+ethtool eth0 | grep "Speed:"
+fi
+echo $space
+
+if [ "$sophos" == "yes" ]
+  then
+echo "------------------------"
+echo "|     SOPHOS AV        |"
+echo "------------------------"
+service sav-protect status
+echo $space
+fi
+
+if [ "$psa" == "yes" ]
+  then
+echo "------------------------"
+echo "|      PLESK           |"
+echo "------------------------"
+cat /etc/psa/psa.key |grep "Key number:"
+echo "Version: `rpm -q psa | awk -F\- '{print $2}'`"
+cat /etc/psa/psa.key | egrep "DrWeb|SpamAssassin"
+
+ if [ `cat /etc/psa/psa.key | egrep "Number of domains:" | awk -F": " '{print $2}'` == 0 ]
+    then
+      echo "Number of domains: unlimited"
+    else
+      cat /etc/psa/psa.key | egrep "Number of domains:"
+ fi
+
+echo $space
+fi
+
+echo "-------------------------"
+echo "|       Memory          |"
+echo "-------------------------"
+free -m | grep Mem: | awk '{print $2 " MB"}'
+echo $space
+
+echo "-------------"
+echo "|   SWAP    |"
+echo "-------------"
+free -m | grep Swap: | awk '{print $2 " MB"}'
+echo $space
+
+if [ "$dmidecode" == "yes" ]
+  then 
+echo "--------------------------------"
+echo "| Memory Modules & Empty slots |"
+echo "--------------------------------"
+dmidecode | egrep "Memory Device$" -A8 | egrep "Memory|Size"
+echo $space
+
+echo "-------------------------"
+echo "|   Process Sockets     |"
+echo "-------------------------"
+dmidecode | grep "Processor Information" -A50 | egrep "Processor Information|Socket Designation: CPU|Status"
+echo $space
+fi
+
+echo "-------------------------"
+echo "| Process Type / Cores  |"
+echo "-------------------------"
+cat /proc/cpuinfo | egrep "processor|model name"
+echo $space
+
+if [ "$megacli" == "yes" ]
+  then
+echo "-------------------------"
+echo "|     RAID INFO         |"
+echo "-------------------------"
+megacli -LDInfo -Lall -aALL
+echo $space
+
+echo "-------------------------"
+echo "|     Physical Disk      |"
+echo "-------------------------"
+megacli -PDList -aALL | egrep "Adapter|Slot|Raw"
+echo $space
+fi
+
+if [ "$omreport" == "yes" ]
+  then 
+echo "-------------------------"
+echo "|     RAID INFO         |"
+echo "-------------------------"
+omreport storage vdisk | egrep "ID|Status|Name|Layout|Size|^$" | egrep -v "Stripe"
+echo $space
+
+echo "-------------------------"
+echo "|     Physical Disk      |"
+echo "-------------------------"
+omreport storage pdisk controller=0 | egrep "ID|Status|Name|State|Capacity|'Used RAID Disk Space'|^$" | egrep -v "Vendor|Product"
+echo $space
+fi
+
+if [ "$hp" == "yes" ]
+  then
+controller=`hpacucli controller all show  | awk '{print $6}' | egrep -v "^$"`
+echo "-------------------------"
+echo "|     RAID INFO         |"
+echo "-------------------------"
+hpacucli controller slot=$controller logicaldrive all show
+echo $space
+
+echo "-------------------------"
+echo "|     Physical Disk      |"
+echo "-------------------------"
+hpacucli controller slot=$controller physicaldrive all show
+echo $space
+fi
+
+if [ "$scsi" == "yes" ]
+  then
+echo "-------------------------"
+echo "|     SCSI DEVICES      |"
+echo "-------------------------"
+cat /proc/scsi/scsi
+echo $space
+fi
+
+
+echo "-----------------------"
+echo "|     Mounted FS      |"
+echo "-----------------------"
+#df -h | egrep "Filesystem|^/"
+for i in `mount | egrep "ext3|ext4" | awk '{print $1}'` ; do df -h $i ; done | egrep -v "^Filesystem"
+echo $space
+
+if [ "$user" == "root" ]
+  then
+
+if [ "`df / | awk '{print $1}' | awk -F\/ '{print $3}' | tail -n 1`" == "cciss" ]
+  then
+echo "----------------------------"
+echo "| Mounte Device Partitions |"
+echo "----------------------------"
+for i in $(df -h | grep "^/" | awk '{print $1}' | sed 's/p[0-9]$//g' | sort | uniq | grep -v mapper)
+ do echo $space
+     echo "    ====== $i ====="
+     fdisk -l $i
+ done
+
+else
+
+echo "-----------------------------"
+echo "| Mounted Device Partitions |"
+echo "-----------------------------"
+for i in $(df -h | grep "^/" | awk '{print $1}' | sed 's/[0-9]//g' | sort | uniq | grep -v mapper)
+  do echo $space
+     echo "    ====== $i ====="
+     fdisk -l $i
+  done
+ fi
+fi
+echo $space
+
+
