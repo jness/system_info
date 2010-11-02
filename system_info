@@ -204,9 +204,9 @@ if [ "$user" == "root" ]
 
 if [ "`df / | awk '{print $1}' | awk -F\/ '{print $3}' | tail -n 1`" == "cciss" ]
   then
-echo "----------------------------"
-echo "| Mounte Device Partitions |"
-echo "----------------------------"
+echo "-----------------------------"
+echo "| Mounted Device Partitions |"
+echo "-----------------------------"
 for i in $(df -h | grep "^/" | awk '{print $1}' | sed 's/p[0-9]$//g' | sort | uniq | grep -v mapper)
  do echo $space
      echo "    ====== $i ====="
