@@ -93,7 +93,7 @@ cat /etc/psa/psa.key |grep "Key number:"
 echo "Version: `rpm -q psa | awk -F\- '{print $2}'`"
 cat /etc/psa/psa.key | egrep "DrWeb|SpamAssassin"
 
- if [ '`cat /etc/psa/psa.key | egrep -i "Number of domains:" | awk -F": " '{print $2}'`' == '0' ]
+ if [ "`cat /etc/psa/psa.key | egrep -i 'Number of domains:' | awk -F': ' '{print $2}'`" == "0" ]
     then
       echo "Number of domains: unlimited"
     else
